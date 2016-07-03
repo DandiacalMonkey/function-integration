@@ -1,0 +1,212 @@
+#include <stdio.h>
+#include <math.h>
+#include <string.h>
+#define precision 0.000001
+double analysis(char *s,int n);//分析所输入的函数
+double integral(char *p,double min,long length);//积分
+double x;
+int k;
+int main(){
+	char s[100];
+	double min,max;
+	long length;
+	
+	printf("输入关于x的函数：");
+	scanf("%s",s);
+	k=strlen(s);
+	printf("输入积分下限：");
+	scanf("%lf",&min);
+	printf("输入积分上限：");
+	scanf("%lf",&max);
+	length=(max-min)/precision;
+	printf("计算结果：%lf",integral(s,min,length));
+	
+	return 0;
+}
+double integral(char *p,double min,long length){//分析函数定义
+	double result=0;
+	/* if(length==0){
+		x=min;
+		result=analysis(p,k)*precision;
+	}
+	else{
+		x=min+length*precision;
+		result=analysis(p,k)*precision+integral(p,min,length-1);
+	} */
+	for(length--;length>=0;length--){//分成多个小长方形进行积分
+		x=min+(length+0.5)*precision;
+		result+=analysis(p,k)*precision;
+	}
+	
+	return result;
+}
+double analysis(char *s,int n){//积分函数定义
+	int number=n,i,j;
+	int index1[number],index2[number],count=0,index_count=0;
+	int index_low[number],low_count=0;
+	int index_high[number],high_count=0;
+	double result;
+	
+	if(number==1){//若输入字节为单字节
+		if(*s=='x')
+			return x;
+		else
+			return *s-'0';
+	}
+	else if(number==0)//若输入为空
+		return 0;
+	if(*s=='('&&*(s+n-1)==')')
+		return analysis(s+1,number-2);
+	for(i=0;i<number;i++){//方程中是否有运算符或未知数
+		if(*(s+i)=='('||*(s+i)==')'||*(s+i)=='+'||*(s+i)=='-'||*(s+i)=='*'||*(s+i)=='/'||*(s+i)=='^'||*(s+i)=='x')
+			break;
+	}
+	if(i==number){//无运算符或未知数情况下，转换为小数输出
+		char str[20];
+		strcpy(str,s);
+		str[number]='\0';
+		return atof(str);
+	}
+	for(i=0;i<number;i++){//查找括号位置
+		if(*(s+i)=='('){
+			if(count==0){
+				index1[index_count]=i;
+			}
+			count++;
+		}
+		if(*(s+i)==')'){
+			count--;
+			if(count==0){
+				index2[index_count++]=i;
+			}
+		}
+	}
+	if(index_count>0){//若有括号
+		for(j=index_count;j>=0;j--){//查找括号外低级运算符位置
+			for(i=(index_count-j)?index2[index_count-j-1]:0;i<(j?index1[index_count-j]:number);i++){
+				if(*(s+i)=='+'||*(s+i)=='-'){
+					index_low[low_count]=i;
+					low_count++;
+				}
+			}
+		}
+		if(low_count==0){//若无低级运算符
+			for(j=index_count;j>=0;j--){//寻找高级运算符
+				for(i=(index_count-j)?index2[index_count-j-1]:0;i<(j?index1[index_count-j]:number);i++){
+					if(*(s+i)=='*'||*(s+i)=='/'){
+						index_high[high_count]=i;
+						high_count++;
+					}
+				}
+			}
+			if(high_count==0){//若无高级运算符
+				for(j=index_count;j>=0;j--){//寻找次方运算符
+					for(i=(index_count-j)?index2[index_count-j-1]:0;i<(j?index1[index_count-j]:number);i++){
+						if(*(s+i)=='^'){
+							result=pow(analysis(s,i),analysis(s+i+1,number-i-1));
+							return result;
+						}
+					}
+				}
+			}
+			else{//有高级运算符
+				for(i=0;i<=high_count;i++){//以高级运算符为节点，拆分多个部分计算
+					if(i==0)
+						result=analysis(s,index_high[0]);
+					else if(i==high_count){
+						if(*(s+index_high[high_count-1])=='*')
+							result*=analysis(s+index_high[high_count-1]+1,n-index_high[high_count-1]-1);
+						else if(*(s+index_high[high_count-1])=='/')
+							result/=analysis(s+index_high[high_count-1]+1,n-index_high[high_count-1]-1);
+					}
+					else{
+						if(*(s+index_high[i-1])=='*')
+							result*=analysis(s+index_high[i-1]+1,index_high[i]-index_high[i-1]-1);
+						else if(*(s+index_high[i-1])=='/')
+							result/=analysis(s+index_high[i-1]+1,index_high[i]-index_high[i-1]-1);
+					}
+				}
+			}
+		}
+		else{//有低级运算符
+			for(i=0;i<=low_count;i++){//以低级运算符为节点，拆分多个部分计算
+				if(i==0)
+					result=analysis(s,index_low[0]);
+				else if(i==low_count){
+					if(*(s+index_low[low_count-1])=='+')
+						result+=analysis(s+index_low[low_count-1]+1,n-index_low[low_count-1]-1);
+					else if(*(s+index_low[low_count-1])=='-')
+						result-=analysis(s+index_low[low_count-1]+1,n-index_low[low_count-1]-1);
+				}
+				else{
+					if(*(s+index_low[i-1])=='+')
+						result+=analysis(s+index_low[i-1]+1,index_low[i]-index_low[i-1]-1);
+					else if(*(s+index_low[i-1])=='-')
+						result-=analysis(s+index_low[i-1]+1,index_low[i]-index_low[i-1]-1);
+				}
+			}
+		}
+	}
+	else{//无括号
+		for(i=0;i<number;i++){//查找低级运算符
+			if(*(s+i)=='+'||*(s+i)=='-'){
+				index_low[low_count]=i;
+				low_count++;
+			}
+		}
+		if(low_count==0){//若无低级运算符
+			for(i=0;i<number;i++){//查找高级运算符
+				if(*(s+i)=='*'||*(s+i)=='/'){
+					index_high[high_count]=i;
+					high_count++;
+				}
+			}
+			if(high_count==0){//若无高级运算符
+				for(i=0;i<number;i++){//寻找次方运算符
+					if(*(s+i)=='^'){
+						result=pow(analysis(s,i),analysis(s+i+1,number-i-1));
+						return result;
+					}
+				}
+			}
+			else{//有高级运算符
+				for(i=0;i<=high_count;i++){//以高级运算符为节点，拆分多个部分计算
+					if(i==0)
+						result=analysis(s,index_high[0]);
+					else if(i==high_count){
+						if(*(s+index_high[high_count-1])=='*')
+							result*=analysis(s+index_high[high_count-1]+1,n-index_high[high_count-1]-1);
+						else if(*(s+index_high[high_count-1])=='/')
+							result/=analysis(s+index_high[high_count-1]+1,n-index_high[high_count-1]-1);
+					}
+					else{
+						if(*(s+index_high[i-1])=='*')
+							result*=analysis(s+index_high[i-1]+1,index_high[i]-index_high[i-1]-1);
+						else if(*(s+index_high[i-1])=='/')
+							result/=analysis(s+index_high[i-1]+1,index_high[i]-index_high[i-1]-1);
+					}
+				}
+			}
+		}
+		else{//有低级运算符
+			for(i=0;i<=low_count;i++){//以低级运算符为节点，拆分多个部分计算
+				if(i==0)
+					result=analysis(s,index_low[0]);
+				else if(i==low_count){
+					if(*(s+index_low[low_count-1])=='+')
+						result+=analysis(s+index_low[low_count-1]+1,n-index_low[low_count-1]-1);
+					else if(*(s+index_low[low_count-1])=='-')
+						result-=analysis(s+index_low[low_count-1]+1,n-index_low[low_count-1]-1);
+				}
+				else{
+					if(*(s+index_low[i-1])=='+')
+						result+=analysis(s+index_low[i-1]+1,index_low[i]-index_low[i-1]-1);
+					else if(*(s+index_low[i-1])=='-')
+						result-=analysis(s+index_low[i-1]+1,index_low[i]-index_low[i-1]-1);
+				}
+			}
+		}
+	}
+	
+	return result;
+}
